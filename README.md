@@ -60,3 +60,30 @@ To set up the project locally, follow these steps:
 3. Type your question regarding Pakistan's Constitution or Legal System in the chat input box.
 
 ## File Structure
+
+law-gpt-chatbot/
+│
+├── app.py # Main application file
+├── config.py # Configuration file for API keys
+├── requirements.txt # List of required Python packages
+├── .gitignore # Files and directories to ignore in Git
+└── Pakistan.pdf # PDF document containing the Constitution of Pakistan
+
+
+## Contributing
+
+Contributions are welcome! If you have suggestions for improvements or new features, please open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Streamlit](https://streamlit.io/) for providing an easy way to build web applications.
+- [LangChain](https://langchain.readthedocs.io/en/latest/) for enabling the integration of language models.
+- [Google Generative AI](https://cloud.google.com/generative-ai) for providing powerful AI capabilities.
+
+## Contact
+
+For any inquiries or feedback, please reach out to [your.email@example.com](mailto:your.email@example.com).

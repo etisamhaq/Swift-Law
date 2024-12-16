@@ -2,7 +2,7 @@ import os
 import PyPDF2
 import streamlit as st
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,28 +19,24 @@ def extract_text_from_pdf(pdf_path):
             text += page.extract_text()
     return text
 
+# Then modify the create_qa_system function:
 def create_qa_system():
-    # Use Pakistan.pdf directly
     pdf_path = "Pakistan.pdf"
     pdf_text = extract_text_from_pdf(pdf_path)
 
-    # Split text into chunks
     text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
     texts = text_splitter.split_text(pdf_text)
 
-    # Create embeddings
     embeddings = HuggingFaceEmbeddings()
+    
+    # Replace Chroma with FAISS
+    db = FAISS.from_texts(texts, embeddings)
 
-    # Create vector store
-    db = Chroma.from_texts(texts, embeddings)
-
-    # Initialize Gemini
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
         temperature=0,
     )
 
-    # Create a retrieval chain
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=db.as_retriever(search_kwargs={"k": 1}))
 
     return qa

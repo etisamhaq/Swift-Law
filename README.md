@@ -27,8 +27,8 @@ To set up the project locally, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/etisamhaq/lawgpt-streamlit.git
-   cd law-gpt-chatbot
+   git clone https://github.com/etisamhaq/Lawgpt-streamlit.git
+   cd Lawgpt-streamlit
    ```
 
 2. **Create a virtual environment** (optional but recommended):

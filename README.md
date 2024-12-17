@@ -18,7 +18,7 @@ The Law-GPT Chatbot is a web application built using Streamlit that allows users
 - **LangChain**: A framework for building applications with language models.
 - **Google Generative AI**: For generating responses based on user queries.
 - **PyPDF2**: For extracting text from PDF files.
-- **Chroma**: A vector store for managing embeddings.
+- **FAISS**: A vector store for managing embeddings.
 - **HuggingFaceEmbeddings**: For creating embeddings from text.
 
 ## Installation
@@ -27,8 +27,8 @@ To set up the project locally, follow these steps:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/etisamhaq/lawgpt-streamlit.git
-   cd law-gpt-chatbot
+   git clone https://github.com/etisamhaq/Lawgpt-streamlit.git
+   cd Lawgpt-streamlit
    ```
 
 2. **Create a virtual environment** (optional but recommended):

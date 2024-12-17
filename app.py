@@ -19,12 +19,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Custom CSS for enhanced styling
 st.markdown("""
 <style>
-    /* Custom color scheme */
     .stApp {
         background-color: #f0f2f6;
     }
     
-    /* Enhanced title styling */
     .title {
         font-size: 2.5rem;
         color: #1a3c5f;
@@ -33,7 +31,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* Chat message styling */
     .user-message {
         background-color: #e6f2ff;
         border-radius: 10px;
@@ -48,10 +45,22 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
-    /* Spinner and status styling */
     .stSpinner > div {
         border-color: #1a3c5f !important;
         border-top-color: transparent !important;
+    }
+    
+    .chat-history-item {
+        background-color: #f0f2f6;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    
+    .chat-history-item:hover {
+        background-color: #e6f2ff;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -99,11 +108,25 @@ def main():
         "Ask questions and get precise, context-aware answers!"
     )
 
-    # Initialize session state for QA system if not already done
+    # Initialize session state for QA system and chat history if not already done
     if 'qa_system' not in st.session_state:
         with st.spinner('🔍 Initializing the legal research assistant...'):
             st.session_state.qa_system = create_qa_system()
         st.success('🚀 Chatbot is ready to assist you!')
+
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+
+    # Display chat history in the sidebar
+    st.sidebar.header("Chat History")
+    for i, message in enumerate(st.session_state.chat_history):
+        if st.sidebar.button(f"Chat {i+1}", key=f"chat_history_item_{i}"):
+            st.session_state.messages = st.session_state.chat_history[:i+1]
+            for msg in st.session_state.messages:
+                if msg["role"] == "user":
+                    st.markdown(f'<div class="user-message">👤 {msg["content"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="assistant-message">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
 
     # Initialize chat history
     if 'messages' not in st.session_state:
@@ -134,6 +157,15 @@ def main():
             
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
+
+        # Update the chat history
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+
+        # Maintain a maximum of 3 chat history items
+        if len(st.session_state.chat_history) > 3:
+            st.session_state.chat_history.pop(0)
+            st.session_state.chat_history.pop(0)
 
     # Footer
     st.markdown("---")

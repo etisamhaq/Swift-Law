@@ -9,6 +9,7 @@ st.set_page_config(
     layout="centered"
 )
 
+import PyPDF2
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
@@ -18,10 +19,12 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Custom CSS for enhanced styling
 st.markdown("""
 <style>
+    /* Custom color scheme */
     .stApp {
         background-color: #f0f2f6;
     }
     
+    /* Enhanced title styling */
     .title {
         font-size: 2.5rem;
         color: #1a3c5f;
@@ -30,6 +33,7 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
+    /* Chat message styling */
     .user-message {
         background-color: #e6f2ff;
         border-radius: 10px;
@@ -44,22 +48,10 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
+    /* Spinner and status styling */
     .stSpinner > div {
         border-color: #1a3c5f !important;
         border-top-color: transparent !important;
-    }
-    
-    .preset-question {
-        background-color: #e6f2ff;
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-    
-    .preset-question:hover {
-        background-color: #d1e7ff;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -107,46 +99,25 @@ def main():
         "Ask questions and get precise, context-aware answers!"
     )
 
-    # Preset questions section
-    st.markdown("### 💡 Quick Start Questions")
-    preset_questions = [
-        "What are the fundamental rights outlined in the Constitution of Pakistan?",
-        "Explain the structure of the judicial system in Pakistan.",
-        "What is the process of constitutional amendment in Pakistan?"
-    ]
-
-    # Initialize chat history if not already done
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
-
-    # Display preset questions with clickable functionality
-    for question in preset_questions:
-        if st.button(question, key=question, use_container_width=True):
-            # Check if the question is already in the chat history
-            if {"role": "user", "content": question} not in st.session_state.messages:
-                # Trigger the QA system with the selected question
-                st.session_state.messages.append({"role": "user", "content": question})
-                
-                # Generate response
-                with st.spinner('🔬 Analyzing legal documents...'):
-                    try:
-                        response = st.session_state.qa_system.run(question)
-                    except Exception as e:
-                        response = f"Apologies, an error occurred: {str(e)}"
-                    
-                    # Display response with assistant styling
-                    st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
-                    
-                    # Add assistant response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-            else:
-                st.warning("You've already asked that question. Please try a different one.")
+    # Knowledge source information
+    with st.expander("📚 Knowledge Source"):
+        st.write("""
+        This chatbot is powered by:
+        - Gemini 1.5 Flash AI model
+        - HuggingFace Embeddings
+        - FAISS Vector Store
+        - Comprehensive PDF document on Pakistan's Legal System
+        """)
 
     # Initialize session state for QA system if not already done
     if 'qa_system' not in st.session_state:
         with st.spinner('🔍 Initializing the legal research assistant...'):
             st.session_state.qa_system = create_qa_system()
         st.success('🚀 Chatbot is ready to assist you!')
+
+    # Initialize chat history
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
 
     # Display chat history with enhanced styling
     for message in st.session_state.messages:

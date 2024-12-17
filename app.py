@@ -1,7 +1,6 @@
 import os
 import PyPDF2
 import streamlit as st
-from datetime import datetime
 
 # Page configuration MUST be the first Streamlit command
 st.set_page_config(
@@ -37,7 +36,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 15px;
         margin-bottom: 10px;
-        text-align: right;
     }
     
     .assistant-message {
@@ -45,13 +43,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 15px;
         margin-bottom: 10px;
-        text-align: left;
-    }
-    
-    .timestamp {
-        font-size: 0.7rem;
-        color: #666;
-        margin-top: 5px;
     }
     
     .stSpinner > div {
@@ -66,22 +57,10 @@ st.markdown("""
         margin-bottom: 5px;
         cursor: pointer;
         transition: background-color 0.3s ease;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
     }
     
     .chat-history-item:hover {
         background-color: #e6f2ff;
-    }
-    
-    .delete-chat-btn {
-        background-color: #ff4b4b;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 5px 10px;
-        cursor: pointer;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -138,58 +117,28 @@ def main():
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
 
-    # Display chat history management in the sidebar
+    # Display chat history in the sidebar
     st.sidebar.header("Chat History")
-    
-    # New feature: Delete individual chat history sessions
     for i, chat in enumerate(st.session_state.chat_history):
-        col1, col2 = st.sidebar.columns([3, 1])
-        with col1:
-            if st.button(f"Chat {i+1} - {chat[0]['timestamp']}", key=f"chat_history_item_{i}"):
-                st.session_state.messages = chat
-        with col2:
-            if st.button("❌", key=f"delete_chat_{i}"):
-                st.session_state.chat_history.pop(i)
-                st.experimental_rerun()
-
-    # Clear all chat history button
-    if st.sidebar.button("🗑️ Clear All Chat History"):
-        st.session_state.chat_history = []
-        st.session_state.messages = []
-        st.experimental_rerun()
+        if st.sidebar.button(f"Chat {i+1}", key=f"chat_history_item_{i}"):
+            st.session_state.messages = chat
 
     # Initialize chat history
     if 'messages' not in st.session_state:
         st.session_state.messages = []
 
-    # Display chat history with enhanced styling and timestamps
+    # Display chat history with enhanced styling
     for message in st.session_state.messages:
         if message["role"] == "user":
-            st.markdown(f'''
-                <div class="user-message">
-                    👤 {message["content"]}
-                    <div class="timestamp">{message.get("timestamp", "")}</div>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="user-message">👤 {message["content"]}</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'''
-                <div class="assistant-message">
-                    🤖 {message["content"]}
-                    <div class="timestamp">{message.get("timestamp", "")}</div>
-                </div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div class="assistant-message">🤖 {message["content"]}</div>', unsafe_allow_html=True)
 
     # Chat input with placeholder and icon
     if prompt := st.chat_input("Ask a question about Pakistan's legal system... 💬"):
-        # Get current timestamp
-        current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Add user message to chat history with timestamp
-        st.session_state.messages.append({
-            "role": "user", 
-            "content": prompt,
-            "timestamp": current_timestamp
-        })
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.markdown(f'<div class="user-message">👤 {prompt}</div>', unsafe_allow_html=True)
 
         # Generate response
         with st.spinner('🔬 Analyzing legal documents...'):
@@ -198,22 +147,18 @@ def main():
             except Exception as e:
                 response = f"Apologies, an error occurred: {str(e)}"
             
-        # Add assistant response to chat history with timestamp
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": response,
-            "timestamp": current_timestamp
-        })
+            # Display response with assistant styling
+            st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
+            
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
-        # Add current session to chat history
+        # Update the chat history
         st.session_state.chat_history.append(st.session_state.messages.copy())
 
-        # Maintain a maximum of 5 chat history items
-        if len(st.session_state.chat_history) > 5:
+        # Maintain a maximum of 3 chat history items
+        if len(st.session_state.chat_history) > 3:
             st.session_state.chat_history.pop(0)
-
-        # Rerun to update the display
-        st.experimental_rerun()
 
     # Footer
     st.markdown("---")

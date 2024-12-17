@@ -42,6 +42,10 @@ def create_qa_system():
     return qa
 
 def main():
+    st.set_page_config(page_title="Law-GPT Chatbot", layout="wide")  # Set page title and layout
+    st.sidebar.title("Navigation")  # Add a sidebar for navigation
+    st.sidebar.write("Use this chatbot to ask questions about Pakistan's Constitution and Legal System.")
+
     st.title("Law-GPT Chatbot")
     st.write("Ask questions about Pakistan's Constitution and Legal System")
 
@@ -55,10 +59,12 @@ def main():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
 
-    # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
+    # Display chat history in a more structured layout
+    chat_container = st.container()  # Create a container for chat messages
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
 
     # Chat input
     if prompt := st.chat_input("Ask your question about Pakistan's legal system"):

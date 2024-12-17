@@ -115,34 +115,38 @@ def main():
         "What is the process of constitutional amendment in Pakistan?"
     ]
 
+    # Initialize chat history if not already done
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+
     # Display preset questions with clickable functionality
     for question in preset_questions:
         if st.button(question, key=question, use_container_width=True):
-            # Trigger the QA system with the selected question
-            st.session_state.messages.append({"role": "user", "content": question})
-            
-            # Generate response
-            with st.spinner('🔬 Analyzing legal documents...'):
-                try:
-                    response = st.session_state.qa_system.run(question)
-                except Exception as e:
-                    response = f"Apologies, an error occurred: {str(e)}"
+            # Check if the question is already in the chat history
+            if {"role": "user", "content": question} not in st.session_state.messages:
+                # Trigger the QA system with the selected question
+                st.session_state.messages.append({"role": "user", "content": question})
                 
-                # Display response with assistant styling
-                st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
-                
-                # Add assistant response to chat history
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                # Generate response
+                with st.spinner('🔬 Analyzing legal documents...'):
+                    try:
+                        response = st.session_state.qa_system.run(question)
+                    except Exception as e:
+                        response = f"Apologies, an error occurred: {str(e)}"
+                    
+                    # Display response with assistant styling
+                    st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
+                    
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+            else:
+                st.warning("You've already asked that question. Please try a different one.")
 
     # Initialize session state for QA system if not already done
     if 'qa_system' not in st.session_state:
         with st.spinner('🔍 Initializing the legal research assistant...'):
             st.session_state.qa_system = create_qa_system()
         st.success('🚀 Chatbot is ready to assist you!')
-
-    # Initialize chat history
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
 
     # Display chat history with enhanced styling
     for message in st.session_state.messages:

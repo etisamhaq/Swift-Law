@@ -7,9 +7,48 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+# Custom CSS for enhanced styling
+st.markdown("""
+<style>
+    /* Custom color scheme */
+    .stApp {
+        background-color: #f0f2f6;
+    }
+    
+    /* Enhanced title styling */
+    .title {
+        font-size: 2.5rem;
+        color: #1a3c5f;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    
+    /* Chat message styling */
+    .user-message {
+        background-color: #e6f2ff;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    
+    .assistant-message {
+        background-color: #f0f9ff;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    
+    /* Spinner and status styling */
+    .stSpinner > div {
+        border-color: #1a3c5f !important;
+        border-top-color: transparent !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Set API key from Streamlit secrets
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
-
 
 def extract_text_from_pdf(pdf_path):
     with open(pdf_path, 'rb') as file:
@@ -19,7 +58,6 @@ def extract_text_from_pdf(pdf_path):
             text += page.extract_text()
     return text
 
-# Then modify the create_qa_system function:
 def create_qa_system():
     pdf_path = "Pakistan.pdf"
     pdf_text = extract_text_from_pdf(pdf_path)
@@ -29,7 +67,6 @@ def create_qa_system():
 
     embeddings = HuggingFaceEmbeddings()
     
-    # Replace Chroma with FAISS
     db = FAISS.from_texts(texts, embeddings)
 
     llm = ChatGoogleGenerativeAI(
@@ -42,45 +79,73 @@ def create_qa_system():
     return qa
 
 def main():
-    st.set_page_config(page_title="Law-GPT Chatbot", layout="wide")  # Set page title and layout
-    st.sidebar.title("Navigation")  # Add a sidebar for navigation
-    st.sidebar.write("Use this chatbot to ask questions about Pakistan's Constitution and Legal System.")
+    # Set page configuration
+    st.set_page_config(
+        page_title="Law-GPT: Pakistan Legal Assistant",
+        page_icon="⚖️",
+        layout="centered"
+    )
 
-    st.title("Law-GPT Chatbot")
-    st.write("Ask questions about Pakistan's Constitution and Legal System")
+    # Custom title with markdown and icon
+    st.markdown('<h1 class="title">⚖️ Law-GPT: Pakistan Legal Assistant</h1>', unsafe_allow_html=True)
+
+    # Sidebar with additional information
+    st.sidebar.header("About This Assistant")
+    st.sidebar.info(
+        "Law-GPT is an AI-powered chatbot that provides insights "
+        "into Pakistan's Constitution and Legal System. "
+        "Ask questions and get precise, context-aware answers!"
+    )
+
+    # Knowledge source information
+    with st.expander("📚 Knowledge Source"):
+        st.write("""
+        This chatbot is powered by:
+        - Gemini 1.5 Flash AI model
+        - HuggingFace Embeddings
+        - FAISS Vector Store
+        - Comprehensive PDF document on Pakistan's Legal System
+        """)
 
     # Initialize session state for QA system if not already done
     if 'qa_system' not in st.session_state:
-        with st.spinner('Initializing the chatbot...'):
+        with st.spinner('🔍 Initializing the legal research assistant...'):
             st.session_state.qa_system = create_qa_system()
-        st.success('Chatbot is ready!')
+        st.success('🚀 Chatbot is ready to assist you!')
 
     # Initialize chat history
     if 'messages' not in st.session_state:
         st.session_state.messages = []
 
-    # Display chat history in a more structured layout
-    chat_container = st.container()  # Create a container for chat messages
-    with chat_container:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+    # Display chat history with enhanced styling
+    for message in st.session_state.messages:
+        if message["role"] == "user":
+            st.markdown(f'<div class="user-message">👤 {message["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="assistant-message">🤖 {message["content"]}</div>', unsafe_allow_html=True)
 
-    # Chat input
-    if prompt := st.chat_input("Ask your question about Pakistan's legal system"):
+    # Chat input with placeholder and icon
+    if prompt := st.chat_input("Ask a question about Pakistan's legal system... 💬"):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
+        st.markdown(f'<div class="user-message">👤 {prompt}</div>', unsafe_allow_html=True)
 
         # Generate response
-        with st.chat_message("assistant"):
-            with st.spinner('Thinking...'):
+        with st.spinner('🔬 Analyzing legal documents...'):
+            try:
                 response = st.session_state.qa_system.run(prompt)
-            st.write(response)
+            except Exception as e:
+                response = f"Apologies, an error occurred: {str(e)}"
+            
+            # Display response with assistant styling
+            st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
             
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
+
+    # Footer
+    st.markdown("---")
+    st.markdown("*Powered by AI | Designed for Legal Research*")
 
 if __name__ == "__main__":
     main()

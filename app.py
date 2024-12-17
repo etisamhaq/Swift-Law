@@ -99,16 +99,6 @@ def main():
         "Ask questions and get precise, context-aware answers!"
     )
 
-    # Knowledge source information
-    with st.expander("📚 Knowledge Source"):
-        st.write("""
-        This chatbot is powered by:
-        - Gemini 1.5 Flash AI model
-        - HuggingFace Embeddings
-        - FAISS Vector Store
-        - Comprehensive PDF document on Pakistan's Legal System
-        """)
-
     # Initialize session state for QA system if not already done
     if 'qa_system' not in st.session_state:
         with st.spinner('🔍 Initializing the legal research assistant...'):

@@ -1,6 +1,15 @@
 import os
 import PyPDF2
 import streamlit as st
+
+# Page configuration MUST be the first Streamlit command
+st.set_page_config(
+    page_title="Law-GPT: Pakistan Legal Assistant",
+    page_icon="⚖️",
+    layout="centered"
+)
+
+import PyPDF2
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
@@ -79,13 +88,6 @@ def create_qa_system():
     return qa
 
 def main():
-    # Set page configuration
-    st.set_page_config(
-        page_title="Law-GPT: Pakistan Legal Assistant",
-        page_icon="⚖️",
-        layout="centered"
-    )
-
     # Custom title with markdown and icon
     st.markdown('<h1 class="title">⚖️ Law-GPT: Pakistan Legal Assistant</h1>', unsafe_allow_html=True)
 

@@ -119,14 +119,9 @@ def main():
 
     # Display chat history in the sidebar
     st.sidebar.header("Chat History")
-    for i, message in enumerate(st.session_state.chat_history):
+    for i, chat in enumerate(st.session_state.chat_history):
         if st.sidebar.button(f"Chat {i+1}", key=f"chat_history_item_{i}"):
-            st.session_state.messages = st.session_state.chat_history[i]
-            for msg in st.session_state.messages:
-                if msg["role"] == "user":
-                    st.markdown(f'<div class="user-message">👤 {msg["content"]}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="assistant-message">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
+            st.session_state.messages = chat
 
     # Initialize chat history
     if 'messages' not in st.session_state:

@@ -121,7 +121,7 @@ def main():
     st.sidebar.header("Chat History")
     for i, message in enumerate(st.session_state.chat_history):
         if st.sidebar.button(f"Chat {i+1}", key=f"chat_history_item_{i}"):
-            st.session_state.messages = st.session_state.chat_history[:i+1]
+            st.session_state.messages = st.session_state.chat_history[i]
             for msg in st.session_state.messages:
                 if msg["role"] == "user":
                     st.markdown(f'<div class="user-message">👤 {msg["content"]}</div>', unsafe_allow_html=True)
@@ -159,12 +159,10 @@ def main():
         st.session_state.messages.append({"role": "assistant", "content": response})
 
         # Update the chat history
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        st.session_state.chat_history.append(st.session_state.messages.copy())
 
         # Maintain a maximum of 3 chat history items
         if len(st.session_state.chat_history) > 3:
-            st.session_state.chat_history.pop(0)
             st.session_state.chat_history.pop(0)
 
     # Footer

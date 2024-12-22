@@ -3,6 +3,7 @@ import PyPDF2
 import streamlit as st
 from functools import lru_cache
 import time
+import json
 
 # Page configuration MUST be the first Streamlit command
 st.set_page_config(
@@ -72,25 +73,28 @@ os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
 # Cache the PDF text extraction
 @lru_cache(maxsize=1)
-def extract_text_from_pdf(pdf_path):
-    with open(pdf_path, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text()
-    return text
+def load_preprocessed_text():
+    try:
+        with open('preprocessed_text.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data["text"]
+    except FileNotFoundError:
+        st.error("Preprocessed text file not found. Please run preprocess_pdf.py first.")
+        return None
 
 # Cache the QA system creation
 @lru_cache(maxsize=1)
 def create_qa_system():
-    pdf_path = "Pakistan.pdf"
-    pdf_text = extract_text_from_pdf(pdf_path)
+    # Load preprocessed text instead of processing PDF
+    text = load_preprocessed_text()
+    if text is None:
+        return None
 
     text_splitter = CharacterTextSplitter(
-        chunk_size=500,  # Reduced from 1000
-        chunk_overlap=50  # Added small overlap for better context
+        chunk_size=500,
+        chunk_overlap=50
     )
-    texts = text_splitter.split_text(pdf_text)
+    texts = text_splitter.split_text(text)
 
     embeddings = HuggingFaceEmbeddings()
     

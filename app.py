@@ -1,6 +1,8 @@
 import os
 import PyPDF2
 import streamlit as st
+from functools import lru_cache
+import time
 
 # Page configuration MUST be the first Streamlit command
 st.set_page_config(
@@ -68,6 +70,8 @@ st.markdown("""
 # Set API key from Streamlit secrets
 os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
+# Cache the PDF text extraction
+@lru_cache(maxsize=1)
 def extract_text_from_pdf(pdf_path):
     with open(pdf_path, 'rb') as file:
         reader = PyPDF2.PdfReader(file)
@@ -76,11 +80,16 @@ def extract_text_from_pdf(pdf_path):
             text += page.extract_text()
     return text
 
+# Cache the QA system creation
+@lru_cache(maxsize=1)
 def create_qa_system():
     pdf_path = "Pakistan.pdf"
     pdf_text = extract_text_from_pdf(pdf_path)
 
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    text_splitter = CharacterTextSplitter(
+        chunk_size=500,  # Reduced from 1000
+        chunk_overlap=50  # Added small overlap for better context
+    )
     texts = text_splitter.split_text(pdf_text)
 
     embeddings = HuggingFaceEmbeddings()
@@ -92,7 +101,16 @@ def create_qa_system():
         temperature=0,
     )
 
-    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=db.as_retriever(search_kwargs={"k": 1}))
+    qa = RetrievalQA.from_chain_type(
+        llm=llm, 
+        chain_type="stuff", 
+        retriever=db.as_retriever(
+            search_kwargs={
+                "k": 1,
+                "score_threshold": 0.5  # Only return relevant results
+            }
+        )
+    )
 
     return qa
 
@@ -108,11 +126,16 @@ def main():
         "Ask questions and get precise, context-aware answers!"
     )
 
-    # Initialize session state for QA system and chat history if not already done
+    # Initialize QA system with progress tracking
     if 'qa_system' not in st.session_state:
+        progress_bar = st.progress(0)
         with st.spinner('🔍 Initializing the legal research assistant...'):
+            start_time = time.time()
             st.session_state.qa_system = create_qa_system()
-        st.success('🚀 Chatbot is ready to assist you!')
+            progress_bar.progress(100)
+            load_time = time.time() - start_time
+            st.success(f'🚀 Chatbot ready in {load_time:.2f} seconds!')
+        progress_bar.empty()
 
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
@@ -126,6 +149,11 @@ def main():
     # Initialize chat history
     if 'messages' not in st.session_state:
         st.session_state.messages = []
+
+    # Limit chat history size
+    max_history_length = 10
+    if len(st.session_state.messages) > max_history_length:
+        st.session_state.messages = st.session_state.messages[-max_history_length:]
 
     # Display chat history with enhanced styling
     for message in st.session_state.messages:

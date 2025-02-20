@@ -4,6 +4,8 @@
 
 The Law-GPT Chatbot is a web application built using Streamlit that allows users to ask questions about Pakistan's Constitution and Legal System. The application utilizes LangChain and Google Generative AI to provide accurate and relevant answers.
 
+![pic](https://github.com/etisamhaq/Swift-Law/blob/main/pic.jpg)
+
 ## Features
 
 - **Interactive Chat Interface**: Users can interact with the chatbot in real-time.

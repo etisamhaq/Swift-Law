@@ -102,7 +102,7 @@ def create_qa_system():
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
-        temperature=0,
+        temperature=0.3,
     )
 
     qa = RetrievalQA.from_chain_type(

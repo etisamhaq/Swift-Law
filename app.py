@@ -103,7 +103,7 @@ def create_qa_system():
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
-        temperature=0.6,
+        temperature=0.7,
     )
     
     # Create a custom prompt template that enforces staying within context

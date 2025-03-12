@@ -103,7 +103,7 @@ def create_qa_system():
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
-        temperature=0.7,
+        temperature=0.5,
     )
     
     # Create a custom prompt template that enforces staying within context
@@ -115,7 +115,7 @@ def create_qa_system():
     Question: {question}
     
     Important instructions:
-    1. If the context doesn't contain information to answer the question, respond with: "I don't have enough information in my knowledge base to answer this question about Pakistan's legal system."
+    1. Explain the answer in detail.
     2. Don't use knowledge outside of the provided context.
     3. Don't make up or infer information not present in the context.
     4. Be precise and cite relevant sections from the context when possible.

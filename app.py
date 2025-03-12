@@ -103,7 +103,7 @@ def create_qa_system():
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
-        temperature=0.3,
+        temperature=0.6,
     )
     
     # Create a custom prompt template that enforces staying within context
@@ -134,7 +134,7 @@ def create_qa_system():
         retriever=db.as_retriever(
             search_kwargs={
                 "k": 3,  # Increased from 1 to get more context
-                "score_threshold": 0.6  # Increased threshold for higher relevance
+                "score_threshold": 0.5  # Increased threshold for higher relevance
             }
         ),
         chain_type_kwargs={"prompt": PROMPT},

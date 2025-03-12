@@ -18,6 +18,7 @@ from langchain.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
 
 # Custom CSS for enhanced styling
 st.markdown("""
@@ -104,16 +105,40 @@ def create_qa_system():
         model="gemini-1.5-flash",
         temperature=0.3,
     )
+    
+    # Create a custom prompt template that enforces staying within context
+    prompt_template = """
+    You are Law-GPT, a specialized assistant for Pakistan's legal system. Answer ONLY based on the context provided.
+    
+    Context: {context}
+    
+    Question: {question}
+    
+    Important instructions:
+    1. If the context doesn't contain information to answer the question, respond with: "I don't have enough information in my knowledge base to answer this question about Pakistan's legal system."
+    2. Don't use knowledge outside of the provided context.
+    3. Don't make up or infer information not present in the context.
+    4. Be precise and cite relevant sections from the context when possible.
+    
+    Answer:
+    """
+    
+    PROMPT = PromptTemplate(
+        template=prompt_template,
+        input_variables=["context", "question"]
+    )
 
     qa = RetrievalQA.from_chain_type(
         llm=llm, 
         chain_type="stuff", 
         retriever=db.as_retriever(
             search_kwargs={
-                "k": 1,
-                "score_threshold": 0.5  # Only return relevant results
+                "k": 3,  # Increased from 1 to get more context
+                "score_threshold": 0.6  # Increased threshold for higher relevance
             }
-        )
+        ),
+        chain_type_kwargs={"prompt": PROMPT},
+        return_source_documents=True  # Enable returning source documents
     )
 
     return qa
@@ -175,7 +200,19 @@ def main():
         # Generate response
         with st.spinner('🔬 Analyzing legal documents...'):
             try:
-                response = st.session_state.qa_system.run(prompt)
+                # The qa_system.run now returns both the answer and source documents
+                result = st.session_state.qa_system({"query": prompt})
+                response = result["result"]
+                
+                # Add sources information if available
+                if hasattr(result, "source_documents") and result["source_documents"]:
+                    sources = [doc.metadata.get("source", "Unknown") for doc in result["source_documents"] if hasattr(doc, "metadata")]
+                    if sources:
+                        response += f"\n\nSources: {', '.join(set(sources))}"
+                
+                # Check if the response indicates no information was found
+                if "don't have enough information" in response.lower() or "insufficient information" in response.lower():
+                    response = "I don't have enough information in my knowledge base to answer this question about Pakistan's legal system. My responses are limited to the specific legal documents I've been trained on."
             except Exception as e:
                 response = f"Apologies, an error occurred: {str(e)}"
             
@@ -191,6 +228,17 @@ def main():
         # Maintain a maximum of 3 chat history items
         if len(st.session_state.chat_history) > 3:
             st.session_state.chat_history.pop(0)
+
+    # Debug toggle in sidebar to show knowledge base statistics
+    with st.sidebar.expander("Debug Information"):
+        if st.button("Show Knowledge Base Stats"):
+            if 'qa_system' in st.session_state:
+                try:
+                    db = st.session_state.qa_system.retriever.vectorstore
+                    st.sidebar.write(f"Total documents: {len(db.index_to_docstore_id)}")
+                    st.sidebar.write(f"Embedding dimensions: {db.embedding_dim}")
+                except:
+                    st.sidebar.write("Could not retrieve stats")
 
     # Footer
     st.markdown("---")

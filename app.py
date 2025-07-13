@@ -1,9 +1,11 @@
 import os
-import PyPDF2
 import streamlit as st
 from functools import lru_cache
 import time
 import json
+import logging
+from typing import Optional, Dict, Any
+import numpy as np
 
 # Page configuration MUST be the first Streamlit command
 st.set_page_config(
@@ -12,13 +14,39 @@ st.set_page_config(
     layout="centered"
 )
 
-import PyPDF2
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
+from langchain.callbacks import StreamingStdOutCallbackHandler
+from langchain.schema import Document
+
+# Import configuration
+try:
+    from config import Config
+    Config.validate()
+except ImportError:
+    # Fallback configuration if config.py doesn't exist
+    class Config:
+        GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+        MODEL_NAME = 'gemini-1.5-flash'
+        TEMPERATURE = 0.1
+        MAX_OUTPUT_TOKENS = 1024
+        TOP_P = 0.8
+        TOP_K = 40
+        EMBEDDING_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
+        CHUNK_SIZE = 1000
+        CHUNK_OVERLAP = 200
+        RETRIEVAL_K = 5
+        SCORE_THRESHOLD = 0.7
+        MAX_INPUT_LENGTH = 500
+        LOG_LEVEL = 'INFO'
+
+# Configure logging
+logging.basicConfig(level=getattr(logging, Config.LOG_LEVEL))
+logger = logging.getLogger(__name__)
 
 # Custom CSS for enhanced styling
 st.markdown("""
@@ -69,8 +97,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Set API key from Streamlit secrets
-os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+# Set API key from configuration
+try:
+    if "GOOGLE_API_KEY" in st.secrets:
+        os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+    elif Config.GOOGLE_API_KEY:
+        os.environ["GOOGLE_API_KEY"] = Config.GOOGLE_API_KEY
+    elif "GOOGLE_API_KEY" not in os.environ:
+        st.error("Google API key not found. Please set it in Streamlit secrets, environment variables, or config.")
+        st.stop()
+except Exception as e:
+    logger.error(f"Error loading API key: {e}")
+    st.error("Error loading API key. Please check your configuration.")
+    st.stop()
 
 # Cache the PDF text extraction
 @lru_cache(maxsize=1)
@@ -78,47 +117,76 @@ def load_preprocessed_text():
     try:
         with open('preprocessed_text.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return data["text"]
+            text = data.get("text", "")
+            if not text:
+                st.error("Preprocessed text file is empty.")
+                return None
+            logger.info(f"Loaded preprocessed text with {len(text)} characters")
+            return text
     except FileNotFoundError:
         st.error("Preprocessed text file not found. Please run preprocess_pdf.py first.")
+        logger.error("preprocessed_text.json not found")
+        return None
+    except json.JSONDecodeError as e:
+        st.error(f"Error parsing preprocessed text file: {e}")
+        logger.error(f"JSON decode error: {e}")
+        return None
+    except Exception as e:
+        st.error(f"Unexpected error loading preprocessed text: {e}")
+        logger.error(f"Unexpected error: {e}")
         return None
 
+# Cache for storing FAISS index
+_faiss_cache = {}
+
 # Cache the QA system creation
-@lru_cache(maxsize=1)
+@st.cache_resource(show_spinner=False)
 def create_qa_system():
     # Load preprocessed text instead of processing PDF
     text = load_preprocessed_text()
     if text is None:
         return None
 
-    text_splitter = CharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
+    # Use RecursiveCharacterTextSplitter for better chunking
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=Config.CHUNK_SIZE,
+        chunk_overlap=Config.CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ".", ",", " ", ""]
     )
     texts = text_splitter.split_text(text)
 
-    embeddings = HuggingFaceEmbeddings()
+    # Use a better embedding model for legal text
+    embeddings = HuggingFaceEmbeddings(
+        model_name=Config.EMBEDDING_MODEL,
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
     
     db = FAISS.from_texts(texts, embeddings)
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        temperature=0.5,
+        model=Config.MODEL_NAME,
+        temperature=Config.TEMPERATURE,  # Lower temperature for more consistent answers
+        max_output_tokens=Config.MAX_OUTPUT_TOKENS,
+        top_p=Config.TOP_P,
+        top_k=Config.TOP_K
     )
     
     # Create a custom prompt template that enforces staying within context
     prompt_template = """
-    You are Law-GPT, a specialized assistant for Pakistan's legal system. Answer ONLY based on the context provided.
+    You are Law-GPT, a specialized legal assistant trained exclusively on Pakistan's legal documents.
     
     Context: {context}
     
     Question: {question}
     
-    Important instructions:
-    1. Explain the answer in detail.
-    2. Don't use knowledge outside of the provided context.
-    3. Don't make up or infer information not present in the context.
-    4. Be precise and cite relevant sections from the context when possible.
+    STRICT INSTRUCTIONS:
+    1. ONLY answer if the question is directly related to Pakistani law AND you can find relevant information in the provided context.
+    2. If the question is NOT about Pakistani law or legal matters, respond with: "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
+    3. If the question IS about Pakistani law but the context doesn't contain relevant information, respond with: "I don't have sufficient information about this specific legal topic in my knowledge base."
+    4. When answering, quote or reference specific sections from the context.
+    5. Do NOT use any external knowledge - only information from the context provided.
+    6. Be precise and factual in your responses.
     
     Answer:
     """
@@ -132,9 +200,10 @@ def create_qa_system():
         llm=llm, 
         chain_type="stuff", 
         retriever=db.as_retriever(
+            search_type="similarity_score_threshold",
             search_kwargs={
-                "k": 3,  # Increased from 1 to get more context
-                "score_threshold": 0.5  # Increased threshold for higher relevance
+                "k": Config.RETRIEVAL_K,  # Get top K most relevant chunks
+                "score_threshold": Config.SCORE_THRESHOLD  # Higher threshold for better relevance
             }
         ),
         chain_type_kwargs={"prompt": PROMPT},
@@ -142,6 +211,60 @@ def create_qa_system():
     )
 
     return qa
+
+def sanitize_input(text: str) -> str:
+    """Sanitize user input to prevent injection attacks."""
+    # Remove any potential harmful characters or patterns
+    import re
+    # Remove multiple spaces, tabs, and newlines
+    text = re.sub(r'\s+', ' ', text)
+    # Remove any special characters that might be used for injection
+    text = re.sub(r'[<>{}\\]', '', text)
+    # Limit length to prevent DoS
+    max_length = Config.MAX_INPUT_LENGTH
+    if len(text) > max_length:
+        text = text[:max_length]
+    return text.strip()
+
+def is_law_related_question(question: str) -> bool:
+    """Check if the question is related to law/legal matters."""
+    law_keywords = [
+        'law', 'legal', 'constitution', 'act', 'section', 'article', 'clause',
+        'regulation', 'statute', 'ordinance', 'bill', 'legislation', 'court',
+        'judge', 'lawyer', 'advocate', 'rights', 'duty', 'obligation', 'penalty',
+        'crime', 'offense', 'punishment', 'jurisdiction', 'pakistan', 'pakistani',
+        'judicial', 'justice', 'tribunal', 'commission', 'authority', 'government',
+        'parliament', 'assembly', 'senate', 'president', 'prime minister'
+    ]
+    question_lower = question.lower()
+    return any(keyword in question_lower for keyword in law_keywords)
+
+def validate_response(response: str, question: str) -> str:
+    """Validate and potentially modify the response based on context relevance."""
+    # Check for common indicators that the model is using external knowledge
+    external_knowledge_indicators = [
+        "based on general knowledge",
+        "in general,",
+        "typically,",
+        "usually,",
+        "commonly,",
+        "it is known that"
+    ]
+    
+    response_lower = response.lower()
+    
+    # If response contains indicators of external knowledge, return appropriate message
+    if any(indicator in response_lower for indicator in external_knowledge_indicators):
+        if is_law_related_question(question):
+            return "I don't have sufficient information about this specific legal topic in my knowledge base. Please note that I can only provide information from Pakistan's legal documents that I have been trained on."
+        else:
+            return "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
+    
+    # Check if response is too short or generic
+    if len(response.strip()) < 50:
+        return "I couldn't find specific information about this in my legal knowledge base. Please try rephrasing your question or ask about a different aspect of Pakistani law."
+    
+    return response
 
 def main():
     # Custom title with markdown and icon
@@ -193,10 +316,25 @@ def main():
 
     # Chat input with placeholder and icon
     if prompt := st.chat_input("Ask a question about Pakistan's legal system... 💬"):
+        # Sanitize input
+        prompt = sanitize_input(prompt)
+        
+        # Check for empty input after sanitization
+        if not prompt:
+            st.warning("Please enter a valid question.")
+            return
+        
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.markdown(f'<div class="user-message">👤 {prompt}</div>', unsafe_allow_html=True)
 
+        # First check if the question is law-related
+        if not is_law_related_question(prompt):
+            response = "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
+            st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            return
+        
         # Generate response
         with st.spinner('🔬 Analyzing legal documents...'):
             try:
@@ -204,17 +342,33 @@ def main():
                 result = st.session_state.qa_system({"query": prompt})
                 response = result["result"]
                 
-                # Add sources information if available
-                if hasattr(result, "source_documents") and result["source_documents"]:
-                    sources = [doc.metadata.get("source", "Unknown") for doc in result["source_documents"] if hasattr(doc, "metadata")]
-                    if sources:
-                        response += f"\n\nSources: {', '.join(set(sources))}"
+                # Get source documents for validation
+                source_documents = result.get("source_documents", [])
                 
-                # Check if the response indicates no information was found
-                if "don't have enough information" in response.lower() or "insufficient information" in response.lower():
-                    response = "I don't have enough information in my knowledge base to answer this question about Pakistan's legal system. My responses are limited to the specific legal documents I've been trained on."
+                # If no relevant documents found, provide appropriate response
+                if not source_documents:
+                    response = "I couldn't find relevant information about this topic in my Pakistani law knowledge base. Please try asking about specific laws, acts, or constitutional matters."
+                else:
+                    # Validate the response
+                    response = validate_response(response, prompt)
+                    
+                    # Add source information if we have a valid response
+                    if not response.startswith("I don't have") and not response.startswith("I can only"):
+                        # Extract relevant chunks from source documents
+                        relevant_chunks = []
+                        for doc in source_documents[:3]:  # Show top 3 sources
+                            if hasattr(doc, 'page_content'):
+                                chunk = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                                relevant_chunks.append(chunk)
+                        
+                        if relevant_chunks:
+                            response += "\n\n📚 **Referenced Sections:**\n"
+                            for i, chunk in enumerate(relevant_chunks, 1):
+                                response += f"\n{i}. {chunk}"
+                
             except Exception as e:
-                response = f"Apologies, an error occurred: {str(e)}"
+                logger.error(f"Error generating response: {str(e)}")
+                response = "An error occurred while processing your question. Please try again or rephrase your question."
             
             # Display response with assistant styling
             st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)

@@ -5,3 +5,4 @@ pypdf2
 faiss-cpu
 sentence-transformers
 langchain-community
+python-dotenv

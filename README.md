@@ -20,7 +20,7 @@ The Law-GPT Chatbot is a web application built using Streamlit that allows users
 - **LangChain**: A framework for building applications with language models.
 - **Google Generative AI**: For generating responses based on user queries.
 - **PyPDF2**: For extracting text from PDF files.
-- **FAISS**: A vector store for managing embeddings.
+- **Pinecone**: Cloud-based vector database for semantic search.
 - **HuggingFaceEmbeddings**: For creating embeddings from text.
 
 ## Installation

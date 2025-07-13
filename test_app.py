@@ -126,16 +126,60 @@ def test_preprocessed_text_exists():
         return False
 
 def test_api_key_configuration():
-    """Test if API key is properly configured."""
+    """Test if API keys are properly configured."""
     print("\n=== Testing API Key Configuration ===")
     
-    # Check environment variable
+    all_keys_found = True
+    
+    # Check Google API key
     if "GOOGLE_API_KEY" in os.environ:
         print("✓ GOOGLE_API_KEY found in environment")
-        return True
     else:
         print("✗ GOOGLE_API_KEY not found in environment")
         print("  Please set it in Streamlit secrets or environment variables")
+        all_keys_found = False
+    
+    # Check Pinecone API key
+    if "PINECONE_API_KEY" in os.environ:
+        print("✓ PINECONE_API_KEY found in environment")
+    else:
+        print("✗ PINECONE_API_KEY not found in environment")
+        print("  Please set it in Streamlit secrets or environment variables")
+        all_keys_found = False
+    
+    return all_keys_found
+
+def test_pinecone_connectivity():
+    """Test if Pinecone is properly configured and accessible."""
+    print("\n=== Testing Pinecone Connectivity ===")
+    
+    try:
+        from pinecone_utils import PineconeManager
+        from config import Config
+        
+        # Initialize Pinecone manager
+        manager = PineconeManager()
+        
+        # Check if index exists
+        stats = manager.get_index_stats()
+        
+        if stats and 'total_vector_count' in stats:
+            vector_count = stats.get('total_vector_count', 0)
+            print(f"✓ Connected to Pinecone index '{Config.PINECONE_INDEX_NAME}'")
+            print(f"  Total vectors: {vector_count}")
+            
+            if vector_count == 0:
+                print("⚠️  Warning: Pinecone index is empty. Run preprocess_pdf_pinecone.py to upload vectors.")
+                return True  # Connection works, just no data
+            else:
+                print("✓ Pinecone index contains data")
+                return True
+        else:
+            print("✗ Could not connect to Pinecone or retrieve stats")
+            return False
+            
+    except Exception as e:
+        print(f"✗ Pinecone connectivity test failed: {str(e)}")
         return False
 
 def run_all_tests():
@@ -147,6 +191,7 @@ def run_all_tests():
     tests = [
         ("Preprocessed Text", test_preprocessed_text_exists),
         ("API Key Configuration", test_api_key_configuration),
+        ("Pinecone Connectivity", test_pinecone_connectivity),
         ("Law-Related Question Detection", test_is_law_related_question),
         ("Response Validation", test_validate_response),
         ("Input Sanitization", test_sanitize_input),

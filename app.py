@@ -15,13 +15,14 @@ st.set_page_config(
 )
 
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.callbacks import StreamingStdOutCallbackHandler
 from langchain.schema import Document
+from langchain_pinecone import PineconeVectorStore
+from pinecone_utils import PineconeManager
 
 # Import configuration
 try:
@@ -31,6 +32,7 @@ except ImportError:
     # Fallback configuration if config.py doesn't exist
     class Config:
         GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+        PINECONE_API_KEY = os.getenv('PINECONE_API_KEY', '')
         MODEL_NAME = 'gemini-1.5-flash'
         TEMPERATURE = 0.1
         MAX_OUTPUT_TOKENS = 1024
@@ -43,6 +45,7 @@ except ImportError:
         SCORE_THRESHOLD = 0.7
         MAX_INPUT_LENGTH = 500
         LOG_LEVEL = 'INFO'
+        PINECONE_INDEX_NAME = 'pakistan-law'
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, Config.LOG_LEVEL))
@@ -97,8 +100,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Set API key from configuration
+# Set API keys from configuration
 try:
+    # Google API Key
     if "GOOGLE_API_KEY" in st.secrets:
         os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
     elif Config.GOOGLE_API_KEY:
@@ -106,9 +110,19 @@ try:
     elif "GOOGLE_API_KEY" not in os.environ:
         st.error("Google API key not found. Please set it in Streamlit secrets, environment variables, or config.")
         st.stop()
+    
+    # Pinecone API Key
+    if "PINECONE_API_KEY" in st.secrets:
+        os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
+    elif Config.PINECONE_API_KEY:
+        os.environ["PINECONE_API_KEY"] = Config.PINECONE_API_KEY
+    elif "PINECONE_API_KEY" not in os.environ:
+        st.error("Pinecone API key not found. Please set it in Streamlit secrets, environment variables, or config.")
+        st.stop()
+        
 except Exception as e:
-    logger.error(f"Error loading API key: {e}")
-    st.error("Error loading API key. Please check your configuration.")
+    logger.error(f"Error loading API keys: {e}")
+    st.error("Error loading API keys. Please check your configuration.")
     st.stop()
 
 # Cache the PDF text extraction
@@ -136,81 +150,82 @@ def load_preprocessed_text():
         logger.error(f"Unexpected error: {e}")
         return None
 
-# Cache for storing FAISS index
-_faiss_cache = {}
-
 # Cache the QA system creation
 @st.cache_resource(show_spinner=False)
 def create_qa_system():
-    # Load preprocessed text instead of processing PDF
-    text = load_preprocessed_text()
-    if text is None:
-        return None
+    try:
+        # Initialize Pinecone manager
+        logger.info("Initializing Pinecone connection...")
+        pinecone_manager = PineconeManager()
+        
+        # Get vector store
+        vector_store = pinecone_manager.get_vector_store()
+        
+        # Check if index has vectors
+        stats = pinecone_manager.get_index_stats()
+        total_vectors = stats.get('total_vector_count', 0)
+        
+        if total_vectors == 0:
+            st.error("No vectors found in Pinecone index. Please run preprocess_pdf_pinecone.py first.")
+            logger.error("Pinecone index is empty")
+            return None
+        
+        logger.info(f"Connected to Pinecone index with {total_vectors} vectors")
 
-    # Use RecursiveCharacterTextSplitter for better chunking
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=Config.CHUNK_SIZE,
-        chunk_overlap=Config.CHUNK_OVERLAP,
-        separators=["\n\n", "\n", ".", ",", " ", ""]
-    )
-    texts = text_splitter.split_text(text)
+        llm = ChatGoogleGenerativeAI(
+            model=Config.MODEL_NAME,
+            temperature=Config.TEMPERATURE,  # Lower temperature for more consistent answers
+            max_output_tokens=Config.MAX_OUTPUT_TOKENS,
+            top_p=Config.TOP_P,
+            top_k=Config.TOP_K
+        )
+        
+        # Create a custom prompt template that enforces staying within context
+        prompt_template = """
+        You are Law-GPT, a specialized legal assistant trained exclusively on Pakistan's legal documents.
+        
+        Context: {context}
+        
+        Question: {question}
+        
+        INSTRUCTIONS:
+        1. ONLY answer if the question is directly related to Pakistani law AND you can find relevant information in the provided context.
+        2. If the question is NOT about Pakistani law or legal matters, respond with: "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
+        3. If the question IS about Pakistani law but the context doesn't contain relevant information, respond with: "I don't have sufficient information about this specific legal topic in my knowledge base."
+        4. When answering, quote or reference specific sections from the context.
+        5. Do NOT use any external knowledge - only information from the context provided.
+        6. Be precise and factual in your responses.
+        
+        Answer:
+        """
+        
+        PROMPT = PromptTemplate(
+            template=prompt_template,
+            input_variables=["context", "question"]
+        )
 
-    # Use a better embedding model for legal text
-    embeddings = HuggingFaceEmbeddings(
-        model_name=Config.EMBEDDING_MODEL,
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
-    
-    db = FAISS.from_texts(texts, embeddings)
-
-    llm = ChatGoogleGenerativeAI(
-        model=Config.MODEL_NAME,
-        temperature=Config.TEMPERATURE,  # Lower temperature for more consistent answers
-        max_output_tokens=Config.MAX_OUTPUT_TOKENS,
-        top_p=Config.TOP_P,
-        top_k=Config.TOP_K
-    )
-    
-    # Create a custom prompt template that enforces staying within context
-    prompt_template = """
-    You are Law-GPT, a specialized legal assistant trained exclusively on Pakistan's legal documents.
-    
-    Context: {context}
-    
-    Question: {question}
-    
-    STRICT INSTRUCTIONS:
-    1. ONLY answer if the question is directly related to Pakistani law AND you can find relevant information in the provided context.
-    2. If the question is NOT about Pakistani law or legal matters, respond with: "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
-    3. If the question IS about Pakistani law but the context doesn't contain relevant information, respond with: "I don't have sufficient information about this specific legal topic in my knowledge base."
-    4. When answering, quote or reference specific sections from the context.
-    5. Do NOT use any external knowledge - only information from the context provided.
-    6. Be precise and factual in your responses.
-    
-    Answer:
-    """
-    
-    PROMPT = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "question"]
-    )
-
-    qa = RetrievalQA.from_chain_type(
-        llm=llm, 
-        chain_type="stuff", 
-        retriever=db.as_retriever(
-            search_type="similarity_score_threshold",
+        # Create custom retriever with Pinecone
+        retriever = vector_store.as_retriever(
+            search_type="similarity",
             search_kwargs={
-                "k": Config.RETRIEVAL_K,  # Get top K most relevant chunks
-                "score_threshold": Config.SCORE_THRESHOLD  # Higher threshold for better relevance
+                "k": Config.RETRIEVAL_K  # Get top K most relevant chunks
             }
-        ),
-        chain_type_kwargs={"prompt": PROMPT},
-        return_source_documents=True  # Enable returning source documents
-    )
+        )
+        
+        qa = RetrievalQA.from_chain_type(
+            llm=llm, 
+            chain_type="stuff", 
+            retriever=retriever,
+            chain_type_kwargs={"prompt": PROMPT},
+            return_source_documents=True  # Enable returning source documents
+        )
 
-    return qa
+        return qa
+    
+    except Exception as e:
+        logger.error(f"Error creating QA system: {e}")
+        st.error(f"Failed to initialize QA system: {str(e)}")
+        return None
 
 def sanitize_input(text: str) -> str:
     """Sanitize user input to prevent injection attacks."""
@@ -359,6 +374,10 @@ def main():
                         for doc in source_documents[:3]:  # Show top 3 sources
                             if hasattr(doc, 'page_content'):
                                 chunk = doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                                # Add chunk metadata if available
+                                if hasattr(doc, 'metadata') and doc.metadata:
+                                    chunk_id = doc.metadata.get('chunk_id', 'Unknown')
+                                    chunk = f"[Chunk {chunk_id}] {chunk}"
                                 relevant_chunks.append(chunk)
                         
                         if relevant_chunks:
@@ -388,11 +407,15 @@ def main():
         if st.button("Show Knowledge Base Stats"):
             if 'qa_system' in st.session_state:
                 try:
-                    db = st.session_state.qa_system.retriever.vectorstore
-                    st.sidebar.write(f"Total documents: {len(db.index_to_docstore_id)}")
-                    st.sidebar.write(f"Embedding dimensions: {db.embedding_dim}")
-                except:
-                    st.sidebar.write("Could not retrieve stats")
+                    pinecone_manager = PineconeManager()
+                    stats = pinecone_manager.get_index_stats()
+                    st.sidebar.write(f"**Pinecone Index Stats:**")
+                    st.sidebar.write(f"Total vectors: {stats.get('total_vector_count', 0)}")
+                    st.sidebar.write(f"Index name: {Config.PINECONE_INDEX_NAME}")
+                    st.sidebar.write(f"Dimension: {stats.get('dimension', Config.PINECONE_DIMENSION)}")
+                    st.sidebar.write(f"Index fullness: {stats.get('index_fullness', 0):.2%}")
+                except Exception as e:
+                    st.sidebar.write(f"Could not retrieve stats: {str(e)}")
 
     # Footer
     st.markdown("---")

@@ -1,8 +1,10 @@
 streamlit
 langchain
 langchain-google-genai
+langchain-pinecone
 pypdf2
-faiss-cpu
+pinecone-client
 sentence-transformers
 langchain-community
 python-dotenv
+numpy

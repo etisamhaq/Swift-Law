@@ -3,7 +3,7 @@ langchain
 langchain-google-genai
 langchain-pinecone
 pypdf2
-pinecone-client
+pinecone
 sentence-transformers
 langchain-community
 python-dotenv

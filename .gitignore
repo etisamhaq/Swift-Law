@@ -1,4 +1,51 @@
-config.py
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+VENV/
+.venv
+
+# Environment variables
 .env
-CLAUDE.md
+.env.local
+.env.*.local
+
+# API Keys and Secrets (keep config.py since it's already committed)
+secrets.toml
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (for PM2)
+node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Don't ignore example files
+!.env.example

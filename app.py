@@ -51,51 +51,146 @@ except ImportError:
 logging.basicConfig(level=getattr(logging, Config.LOG_LEVEL))
 logger = logging.getLogger(__name__)
 
-# Custom CSS for enhanced styling
+# Custom CSS for enhanced styling with dark mode support
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #f0f2f6;
+    /* Light mode styles (default) */
+    @media (prefers-color-scheme: light) {
+        .stApp {
+            background-color: #f0f2f6;
+        }
+        
+        .title {
+            font-size: 2.5rem;
+            color: #1a3c5f;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .user-message {
+            background-color: #e6f2ff;
+            color: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .assistant-message {
+            background-color: #f0f9ff;
+            color: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .chat-history-item {
+            background-color: #f0f2f6;
+            color: #1a1a1a;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .chat-history-item:hover {
+            background-color: #e6f2ff;
+        }
     }
     
-    .title {
-        font-size: 2.5rem;
-        color: #1a3c5f;
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 20px;
+    /* Dark mode styles */
+    @media (prefers-color-scheme: dark) {
+        .stApp {
+            background-color: #0e1117;
+        }
+        
+        .title {
+            font-size: 2.5rem;
+            color: #6eb5ff;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .user-message {
+            background-color: #1e2938;
+            color: #e0e0e0;
+            border: 1px solid #2e3b4e;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .assistant-message {
+            background-color: #262c3b;
+            color: #e0e0e0;
+            border: 1px solid #2e3b4e;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .chat-history-item {
+            background-color: #1e2938;
+            color: #e0e0e0;
+            border: 1px solid #2e3b4e;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .chat-history-item:hover {
+            background-color: #2e3b4e;
+        }
+        
+        /* Additional dark mode specific styles */
+        .stMarkdown {
+            color: #e0e0e0;
+        }
+        
+        .stSidebar {
+            background-color: #262730;
+        }
+        
+        .stSidebar [data-testid="stMarkdownContainer"] {
+            color: #e0e0e0;
+        }
     }
     
-    .user-message {
-        background-color: #e6f2ff;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 10px;
-    }
-    
-    .assistant-message {
-        background-color: #f0f9ff;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 10px;
-    }
-    
+    /* Common styles for both modes */
     .stSpinner > div {
         border-color: #1a3c5f !important;
         border-top-color: transparent !important;
     }
     
-    .chat-history-item {
-        background-color: #f0f2f6;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
+    /* Force dark mode styles in Streamlit's dark theme */
+    [data-testid="stAppViewContainer"][data-theme="dark"] .title {
+        color: #6eb5ff;
     }
     
-    .chat-history-item:hover {
-        background-color: #e6f2ff;
+    [data-testid="stAppViewContainer"][data-theme="dark"] .user-message {
+        background-color: #1e2938;
+        color: #e0e0e0;
+        border: 1px solid #2e3b4e;
+    }
+    
+    [data-testid="stAppViewContainer"][data-theme="dark"] .assistant-message {
+        background-color: #262c3b;
+        color: #e0e0e0;
+        border: 1px solid #2e3b4e;
+    }
+    
+    [data-testid="stAppViewContainer"][data-theme="dark"] .chat-history-item {
+        background-color: #1e2938;
+        color: #e0e0e0;
+        border: 1px solid #2e3b4e;
+    }
+    
+    [data-testid="stAppViewContainer"][data-theme="dark"] .chat-history-item:hover {
+        background-color: #2e3b4e;
     }
 </style>
 """, unsafe_allow_html=True)

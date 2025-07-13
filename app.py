@@ -189,12 +189,12 @@ def create_qa_system():
         Question: {question}
         
         INSTRUCTIONS:
-        1. ONLY answer if the question is directly related to Pakistani law AND you can find relevant information in the provided context.
-        2. If the question is NOT about Pakistani law or legal matters, respond with: "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
-        3. If the question IS about Pakistani law but the context doesn't contain relevant information, respond with: "I don't have sufficient information about this specific legal topic in my knowledge base."
-        4. When answering, quote or reference specific sections from the context.
-        5. Do NOT use any external knowledge - only information from the context provided.
-        6. Be precise and factual in your responses.
+        1. ONLY answer if you can find relevant information in the provided context.
+        2. If the context doesn't contain relevant information, respond with: "I don't have sufficient information about this topic in my knowledge base."
+        3. When answering, quote or reference specific sections from the context.
+        4. Do NOT use any external knowledge - only information from the context provided.
+        5. Be precise and factual in your responses.
+        6. Focus on Pakistani law and legal matters based on the provided context.
         
         Answer:
         """
@@ -241,20 +241,8 @@ def sanitize_input(text: str) -> str:
         text = text[:max_length]
     return text.strip()
 
-def is_law_related_question(question: str) -> bool:
-    """Check if the question is related to law/legal matters."""
-    law_keywords = [
-        'law', 'legal', 'constitution', 'act', 'section', 'article', 'clause',
-        'regulation', 'statute', 'ordinance', 'bill', 'legislation', 'court',
-        'judge', 'lawyer', 'advocate', 'rights', 'duty', 'obligation', 'penalty',
-        'crime', 'offense', 'punishment', 'jurisdiction', 'pakistan', 'pakistani',
-        'judicial', 'justice', 'tribunal', 'commission', 'authority', 'government',
-        'parliament', 'assembly', 'senate', 'president', 'prime minister'
-    ]
-    question_lower = question.lower()
-    return any(keyword in question_lower for keyword in law_keywords)
 
-def validate_response(response: str, question: str) -> str:
+def validate_response(response: str, source_documents: list) -> str:
     """Validate and potentially modify the response based on context relevance."""
     # Check for common indicators that the model is using external knowledge
     external_knowledge_indicators = [
@@ -270,10 +258,7 @@ def validate_response(response: str, question: str) -> str:
     
     # If response contains indicators of external knowledge, return appropriate message
     if any(indicator in response_lower for indicator in external_knowledge_indicators):
-        if is_law_related_question(question):
-            return "I don't have sufficient information about this specific legal topic in my knowledge base. Please note that I can only provide information from Pakistan's legal documents that I have been trained on."
-        else:
-            return "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
+        return "I don't have sufficient information about this specific topic in my knowledge base. Please note that I can only provide information from Pakistan's legal documents that I have been trained on."
     
     # Check if response is too short or generic
     if len(response.strip()) < 50:
@@ -343,12 +328,6 @@ def main():
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.markdown(f'<div class="user-message">👤 {prompt}</div>', unsafe_allow_html=True)
 
-        # First check if the question is law-related
-        if not is_law_related_question(prompt):
-            response = "I can only answer questions about Pakistan's legal system. Please ask a law-related question."
-            st.markdown(f'<div class="assistant-message">🤖 {response}</div>', unsafe_allow_html=True)
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            return
         
         # Generate response
         with st.spinner('🔬 Analyzing legal documents...'):
@@ -365,7 +344,7 @@ def main():
                     response = "I couldn't find relevant information about this topic in my Pakistani law knowledge base. Please try asking about specific laws, acts, or constitutional matters."
                 else:
                     # Validate the response
-                    response = validate_response(response, prompt)
+                    response = validate_response(response, source_documents)
                     
                     # Add source information if we have a valid response
                     if not response.startswith("I don't have") and not response.startswith("I can only"):

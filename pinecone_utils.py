@@ -35,8 +35,8 @@ class PineconeManager:
                     dimension=Config.PINECONE_DIMENSION,
                     metric=Config.PINECONE_METRIC,
                     spec=ServerlessSpec(
-                        cloud='gcp',
-                        region='us-central1'
+                        cloud='aws',
+                        region='us-east-1',
                     )
                 )
                 logger.info(f"Successfully created index: {self.index_name}")

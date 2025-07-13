@@ -8,39 +8,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import functions from app
-from app import is_law_related_question, validate_response, sanitize_input
+from app import validate_response, sanitize_input
 
-def test_is_law_related_question():
-    """Test the law-related question detection function."""
-    print("\n=== Testing Law-Related Question Detection ===")
-    
-    # Test cases
-    test_cases = [
-        # Law-related questions
-        ("What is Article 25 of Pakistan Constitution?", True),
-        ("Tell me about criminal law in Pakistan", True),
-        ("What are the rights of citizens under Pakistani law?", True),
-        ("Explain the judicial system of Pakistan", True),
-        ("What is the punishment for theft in Pakistan?", True),
-        
-        # Non-law related questions
-        ("What is the weather today?", False),
-        ("How to cook biryani?", False),
-        ("Tell me about machine learning", False),
-        ("What is 2 + 2?", False),
-        ("Who won the cricket match?", False),
-    ]
-    
-    passed = 0
-    for question, expected in test_cases:
-        result = is_law_related_question(question)
-        status = "✓" if result == expected else "✗"
-        print(f"{status} '{question}' -> Expected: {expected}, Got: {result}")
-        if result == expected:
-            passed += 1
-    
-    print(f"\nPassed: {passed}/{len(test_cases)}")
-    return passed == len(test_cases)
 
 def test_validate_response():
     """Test the response validation function."""
@@ -48,21 +17,21 @@ def test_validate_response():
     
     test_cases = [
         # Response with external knowledge indicators
-        ("Based on general knowledge, the law states...", "What is the law?", True),
-        ("Typically, in Pakistan law...", "Tell me about Pakistan law", True),
+        ("Based on general knowledge, the law states...", [], True),
+        ("Typically, in Pakistan law...", [], True),
         
         # Short/generic responses
-        ("Yes", "Is this legal?", True),
-        ("No information found", "What is Article 25?", True),
+        ("Yes", [], True),
+        ("No information found", [], True),
         
         # Valid responses
-        ("According to Article 25 of the Constitution of Pakistan, all citizens are equal before law and are entitled to equal protection of law.", "What is Article 25?", False),
-        ("The Pakistan Penal Code Section 379 defines theft as whoever intending to take dishonestly any moveable property out of the possession of any person without that person's consent.", "What is theft in Pakistan law?", False),
+        ("According to Article 25 of the Constitution of Pakistan, all citizens are equal before law and are entitled to equal protection of law.", [], False),
+        ("The Pakistan Penal Code Section 379 defines theft as whoever intending to take dishonestly any moveable property out of the possession of any person without that person's consent.", [], False),
     ]
     
     passed = 0
-    for response, question, should_be_modified in test_cases:
-        result = validate_response(response, question)
+    for response, source_docs, should_be_modified in test_cases:
+        result = validate_response(response, source_docs)
         was_modified = result != response
         status = "✓" if was_modified == should_be_modified else "✗"
         print(f"{status} Response modified: {was_modified} (Expected: {should_be_modified})")
@@ -192,7 +161,6 @@ def run_all_tests():
         ("Preprocessed Text", test_preprocessed_text_exists),
         ("API Key Configuration", test_api_key_configuration),
         ("Pinecone Connectivity", test_pinecone_connectivity),
-        ("Law-Related Question Detection", test_is_law_related_question),
         ("Response Validation", test_validate_response),
         ("Input Sanitization", test_sanitize_input),
     ]
@@ -231,7 +199,6 @@ if __name__ == "__main__":
     # For testing individual functions during development
     if len(sys.argv) > 1 and sys.argv[1] == "--individual":
         # Run individual tests
-        test_is_law_related_question()
         test_validate_response()
         test_sanitize_input()
     else:
